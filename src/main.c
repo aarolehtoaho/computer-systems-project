@@ -11,17 +11,63 @@
 #include "tkjhat/sdk.h"
 
 // Default stack size for the tasks. It can be reduced to 1024 if task is not using lot of memory.
-#define DEFAULT_STACK_SIZE 2048 
+#define DEFAULT_STACK_SIZE 2048
 
-//Add here necessary states
-enum state { IDLE=1 };
-enum state programState = IDLE;
+enum state { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE };
+enum state programState = WRITING_MESSAGE;
 
-static void example_task(void *arg){
+static void sensor_task(void *arg){
     (void)arg;
 
     for(;;){
-        tight_loop_contents(); // Modify with application code here.
+        tight_loop_contents(); // comment this out when implemented task
+
+        if (programState == WRITING_MESSAGE) {
+            // Adds a character in message based on device position when button 1 is pressed and writes a space when button 2 is pressed.
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+static void send_message_task(void *arg){
+    (void)arg;
+
+    for(;;){
+        tight_loop_contents(); // comment out
+
+        if (programState == MESSAGE_READY) {
+            // Sends message stored in a global variable when writing message is finished with 3 spaces.
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+static void receive_message_task(void *arg){
+    (void)arg;
+
+    for(;;){
+        tight_loop_contents(); // comment out
+
+        if (programState == RECEIVING_MESSAGE) {
+            // Receives message from workstation.
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+static void actuator_task(void *arg){
+    (void)arg;
+
+    for(;;){
+        tight_loop_contents(); // Comment out
+
+        if (programState == DISPLAY_MESSAGE) {
+            // Shows received message in the LCD screen and plays sounds with buzzer or blinks led.
+        }
+
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
@@ -35,17 +81,35 @@ int main() {
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
-    TaskHandle_t myExampleTask = NULL;
+    TaskHandle_t hSensorTask, hSendMessageTask, hReceiveMessageTask, hActuatorTask = NULL;
     // Create the tasks with xTaskCreate
-    BaseType_t result = xTaskCreate(example_task,       // (en) Task function
-                "example",              // (en) Name of the task 
+    BaseType_t result = xTaskCreate(sensor_task,       // (en) Task function
+                "sensor",              // (en) Name of the task 
                 DEFAULT_STACK_SIZE, // (en) Size of the stack for this task (in words). Generally 1024 or 2048
                 NULL,               // (en) Arguments of the task 
                 2,                  // (en) Priority of this task
-                &myExampleTask);    // (en) A handle to control the execution of this task
+                &hSensorTask);    // (en) A handle to control the execution of this task
 
     if(result != pdPASS) {
-        printf("Example Task creation failed\n");
+        printf("Sensor Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(send_message_task, "send_message", DEFAULT_STACK_SIZE, NULL, 2, &hSendMessageTask);
+    if(result != pdPASS) {
+        printf("Send Message Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(receive_message_task, "receive_message", DEFAULT_STACK_SIZE, NULL, 2, &hReceiveMessageTask);
+    if(result != pdPASS) {
+        printf("Receive Message Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(actuator_task, "actuator", DEFAULT_STACK_SIZE, NULL, 2, &hActuatorTask);
+    if(result != pdPASS) {
+        printf("Actuator Task creation failed\n");
         return 0;
     }
 

@@ -10,7 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Define project name
 set(APP_NAME morse_device) 
 # Define main app (app in this folder)
-set(MAIN_TARGET hat_app)
+set(MAIN_TARGET morse_app)
 #===============================================================================================
 
 # Initialise pico_sdk from installed location
