@@ -16,6 +16,10 @@
 enum state { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE };
 enum state programState = WRITING_MESSAGE;
 
+static void btn_fxn(uint gpio, uint32_t eventMask){
+
+}
+
 static void sensor_task(void *arg){
     (void)arg;
 
@@ -80,6 +84,13 @@ int main() {
     }*/ 
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
+
+    // button initializtions + interruption handelers
+    //(Not sure if this work. Also haven't found anything for GPIO_IRQ_EDGE_RISE)
+    init_button1();
+    init_button2();
+    gpio_set_irq_enable_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enable_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
 
     TaskHandle_t hSensorTask, hSendMessageTask, hReceiveMessageTask, hActuatorTask = NULL;
     // Create the tasks with xTaskCreate
