@@ -27,18 +27,33 @@ static void message_clear() {
     message_length = 0;
 }
 
-static void btn_fxn(uint gpio, uint32_t eventMask){
+volatile bool button1value = false;
+volatile bool button2value = false;
 
+static void btn_fxn(uint gpio, uint32_t eventMask){
+    //changes the global value of button 1 or 2 to true if pressed. These values could be used in sensor_task when capturing the values from actuators.
+    //the rising edge should trigger the interrupt immediately when the button is pressed? 
+    if (eventMask & GPIO_IRQ_EDGE_RISE){
+        if(gpio == BUTTON1) {
+            button1value = true;
+        }else if(gpio == BUTTON2){
+            button2value = true;
+        }
+    }
 }
 
 static void sensor_task(void *arg){
     (void)arg;
 
+    //values read by the ICM42670 sensor
+    float ax, ay, az, gx, gy, gz, t;
+
     for(;;){
         tight_loop_contents(); // comment this out when implemented task
-
+        
         if (programState == WRITING_MESSAGE) {
             // Adds a character in message based on device position when button 1 is pressed and writes a space when button 2 is pressed.
+
         }
         
         vTaskDelay(pdMS_TO_TICKS(2000));
@@ -53,6 +68,7 @@ static void send_message_task(void *arg){
 
         if (programState == MESSAGE_READY) {
             // Sends message stored in a global variable when writing message is finished with 3 spaces.
+
         }
         
         vTaskDelay(pdMS_TO_TICKS(2000));
