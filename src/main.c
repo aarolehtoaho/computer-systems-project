@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include <pico/stdlib.h>
 
@@ -12,9 +13,20 @@
 
 // Default stack size for the tasks. It can be reduced to 1024 if task is not using lot of memory.
 #define DEFAULT_STACK_SIZE 2048
+#define MESSAGE_MAX_LENGTH 256
 
-enum state { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE };
-enum state programState = WRITING_MESSAGE;
+typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
+typedef enum { DOT = '.', DASH = '-', SPACE = ' ' } Character ;
+
+State programState = WRITING_MESSAGE;
+
+Character message[MESSAGE_MAX_LENGTH];
+uint8_t message_length = 0;
+
+//static void message_append(Character c) {}
+static void message_clear() {
+    message_length = 0;
+}
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
 
@@ -65,14 +77,39 @@ static void receive_message_task(void *arg){
 static void actuator_task(void *arg){
     (void)arg;
 
-    for(;;){
-        tight_loop_contents(); // Comment out
+    init_display();
+    int textBeginIndex = 0;
 
+    for(;;){
         if (programState == DISPLAY_MESSAGE) {
-            // Shows received message in the LCD screen and plays sounds with buzzer or blinks led.
+            // TODO: add buzzer sounds and/or led blink
+            clear_display();
+
+            // Max amount of characters displayed is 10. If there is less
+            // characters after begin index, the amount is reduced.
+            int8_t display_text_length = 10;
+            int8_t lastIndex = display_text_length + textBeginIndex;
+            if (lastIndex > message_length) {
+                int8_t overflow = lastIndex - message_length;
+                display_text_length -= overflow;
+            }
+
+            char display_text[display_text_length + 1];
+            strncpy(display_text, message + textBeginIndex, display_text_length);
+            write_text(display_text);
+
+
+            textBeginIndex++;
+            bool wholeMessageDisplayed = textBeginIndex >= message_length;
+            if (wholeMessageDisplayed) {
+                textBeginIndex = 0;
+                clear_display();
+                message_clear();
+                programState = WRITING_MESSAGE;
+            }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
