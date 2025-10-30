@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -78,11 +77,11 @@ static void actuator_task(void *arg){
     (void)arg;
 
     init_display();
+    init_buzzer();
     int textBeginIndex = 0;
 
     for(;;){
         if (programState == DISPLAY_MESSAGE) {
-            // TODO: add buzzer sounds and/or led blink
             clear_display();
 
             // Max amount of characters displayed is 10. If there is less
@@ -96,8 +95,8 @@ static void actuator_task(void *arg){
 
             char display_text[display_text_length + 1];
             strncpy(display_text, message + textBeginIndex, display_text_length);
+            display_text[display_text_length] = '\0';
             write_text(display_text);
-
 
             textBeginIndex++;
             bool wholeMessageDisplayed = textBeginIndex >= message_length;
@@ -105,6 +104,7 @@ static void actuator_task(void *arg){
                 textBeginIndex = 0;
                 clear_display();
                 message_clear();
+                buzzer_play_tone(440, 500);
                 programState = WRITING_MESSAGE;
             }
         }
