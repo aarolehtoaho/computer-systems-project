@@ -47,16 +47,17 @@ static void message_clear() {
     message_length = 0;
 }
 
-volatile bool button1IsPressed = false;
+//volatile bool button1IsPressed = false;
 volatile bool button2IsPressed = false;
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
     //changes the global value of button 1 or 2 to true if pressed. These values could be used in sensor_task when capturing the values from actuators.
-    //the rising edge should trigger the interrupt immediately when the button is pressed? 
-    if (eventMask & GPIO_IRQ_EDGE_RISE){
-        if(gpio == BUTTON1) {
-            button1IsPressed = true;
-        }else if(gpio == BUTTON2){
+    // The button 1 is not working so using only button 2
+    if (eventMask == GPIO_IRQ_EDGE_RISE){
+        //if(gpio == BUTTON1) {
+        //    button1IsPressed = true;
+        //}
+        if(gpio == BUTTON2){
             button2IsPressed = true;
         }
     }
@@ -65,36 +66,43 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
 static void sensor_task(void *arg){
     (void)arg;
 
-    init_ICM42670();
+    if (init_ICM42670() == OK) {
+        ICM42670_start_with_default_values();
+    }
 
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
 
     for(;;){
-        tight_loop_contents(); // comment this out when implemented task
-        
         if (programState == WRITING_MESSAGE) {
             // Adds a character in message based on device position when button 1 is pressed and writes a space when button 2 is pressed.
 
-            if (button1IsPressed && ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t) == 0) {
-                // TODO: handle sensor position and append corresponding character
-
-                // Placeholder print
-                printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
-
-                button1IsPressed = false;
-            }
             if (button2IsPressed) {
-                // TODO: handle full message
+                int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
+                if (readStatus == OK) {
+                    // TODO: handle sensor position and append corresponding character
+
+                    // Placeholder print
+                    printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
+
+                    button2IsPressed = false;
+                } else {
+                    printf("Cannot read sensor");
+                    printf("Status: %d", readStatus);
+                }
+            }
+            /*
+            if (button1IsPressed) {
                 switch (message_append(SPACE)) {
                     case OK:
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
+                        printf("Sending message\n"); 
                         break;
                 }
                 button2IsPressed = false;
-            }
+            }*/
 
         }
         
@@ -107,6 +115,7 @@ static void send_message_task(void *arg){
 
     for(;;){
         tight_loop_contents(); // comment out
+
 
         if (programState == MESSAGE_READY) {
             // Sends message stored in a global variable when writing message is finished with 3 spaces.
@@ -182,9 +191,10 @@ int main() {
 
     // button initializtions + interruption handelers
     //(Not sure if this work. Also haven't found anything for GPIO_IRQ_EDGE_RISE)
-    init_button1();
+    // The button 1 seems to be broken or something. Using only button 2 for now.
+    //init_button1();
+    //gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_FALL, true, btn_fxn);
     init_button2();
-    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
     gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
