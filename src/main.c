@@ -14,12 +14,15 @@
 #define DEFAULT_STACK_SIZE 2048
 #define MESSAGE_MAX_LENGTH 256
 
+#define DOT '.'
+#define DASH '-'
+#define SPACE ' '
+
 typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
-typedef enum { DOT = '.', DASH = '-', SPACE = ' ' } Character ;
 
 State programState = WRITING_MESSAGE;
 
-Character message[MESSAGE_MAX_LENGTH];
+char message[MESSAGE_MAX_LENGTH];
 uint8_t message_length = 0;
 
 //static void message_append(Character c) {}
@@ -142,10 +145,10 @@ int main() {
     //(Not sure if this work. Also haven't found anything for GPIO_IRQ_EDGE_RISE)
     init_button1();
     init_button2();
-    gpio_set_irq_enable_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
-    gpio_set_irq_enable_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
 
-    TaskHandle_t hSensorTask, hSendMessageTask, hReceiveMessageTask, hActuatorTask = NULL;
+    TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
     // Create the tasks with xTaskCreate
     BaseType_t result = xTaskCreate(sensor_task,       // (en) Task function
                 "sensor",              // (en) Name of the task 
