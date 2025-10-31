@@ -30,12 +30,16 @@ static Status message_append(char character) {
     if (!isValidCharacter) {
         return INVALID_CHARACTER;
     }
-    if (message_length >= MESSAGE_MAX_LENGTH) {
+    if (message_length >= MESSAGE_MAX_LENGTH - 1) {
+        message[MESSAGE_MAX_LENGTH - 1] = '\n';
+        message_length++;
         return MESSAGE_FULL;
     }
     if (character == SPACE && message_length > 1) {
         bool isThridSpace = message[message_length - 1] == SPACE && message[message_length - 2] == SPACE;
         if (isThridSpace) {
+            message[message_length] = '\n';
+            message_length++;
             return MESSAGE_FULL;
         }
     }
@@ -53,13 +57,11 @@ volatile bool button2IsPressed = false;
 static void btn_fxn(uint gpio, uint32_t eventMask){
     //changes the global value of button 1 or 2 to true if pressed. These values could be used in sensor_task when capturing the values from actuators.
     // The button 1 is not working so using only button 2
-    if (eventMask == GPIO_IRQ_EDGE_RISE){
-        //if(gpio == BUTTON1) {
-        //    button1IsPressed = true;
-        //}
-        if(gpio == BUTTON2){
-            button2IsPressed = true;
-        }
+    //if(gpio == BUTTON1) {
+    //    button1IsPressed = true;
+    //}
+    if(gpio == BUTTON2){
+        button2IsPressed = true;
     }
 }
 
@@ -68,6 +70,8 @@ static void sensor_task(void *arg){
 
     if (init_ICM42670() == OK) {
         ICM42670_start_with_default_values();
+    } else {
+        printf("Failed to initialize ICM42670");
     }
 
     //values read by the ICM42670 sensor
@@ -81,17 +85,8 @@ static void sensor_task(void *arg){
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
                     //printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
-
-                    float gyroPositionSum = gx + gy + gz;
-                    // Range is based on measurements. When device is on table, the sum is > -0.5 and < 0
-                    float dotMinSum = -0.5;
-                    float dotMaxSum = 0;
-                    Status messageStatus;
-                    if (gyroPositionSum > dotMinSum && gyroPositionSum < dotMaxSum) {
-                        messageStatus = message_append(DOT);
-                    } else {
-                        messageStatus = message_append(DASH);
-                    }
+                    char character = getCharByPosition(gx, gy, gz);
+                    Status messageStatus = message_append(character);
                     switch (messageStatus) {
                         case OK:
                             break;
@@ -124,6 +119,20 @@ static void sensor_task(void *arg){
         
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+}
+
+static char getCharByPosition(float gx, float gy, float gz) {
+    // Initial logic for assigning character for a position.
+    // With taken measurements from the gyro, the sum of x, y and z was
+    // between range of -0.5 to 0. The range can be adjusted or
+    // the logic can be changed completely.
+    float gyroPositionSum = gx + gy + gz;
+    float dotMinSum = -0.5;
+    float dotMaxSum = 0;
+    if (gyroPositionSum > dotMinSum && gyroPositionSum < dotMaxSum) {
+        return DOT;
+    }
+    return DASH;
 }
 
 static void send_message_task(void *arg){
