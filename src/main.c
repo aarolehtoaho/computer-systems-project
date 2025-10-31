@@ -65,6 +65,20 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
     }
 }
 
+static char getCharByPosition(float gx, float gy, float gz) {
+    // Initial logic for assigning character for a position.
+    // With taken measurements from the gyro, the sum of x, y and z was
+    // between range of -0.5 to 0. The range can be adjusted or
+    // the logic can be changed completely.
+    float gyroPositionSum = gx + gy + gz;
+    float dotMinSum = -0.5;
+    float dotMaxSum = 0;
+    if (gyroPositionSum > dotMinSum && gyroPositionSum < dotMaxSum) {
+        return DOT;
+    }
+    return DASH;
+}
+
 static void sensor_task(void *arg){
     (void)arg;
 
@@ -120,33 +134,24 @@ static void sensor_task(void *arg){
     }
 }
 
-static char getCharByPosition(float gx, float gy, float gz) {
-    // Initial logic for assigning character for a position.
-    // With taken measurements from the gyro, the sum of x, y and z was
-    // between range of -0.5 to 0. The range can be adjusted or
-    // the logic can be changed completely.
-    float gyroPositionSum = gx + gy + gz;
-    float dotMinSum = -0.5;
-    float dotMaxSum = 0;
-    if (gyroPositionSum > dotMinSum && gyroPositionSum < dotMaxSum) {
-        return DOT;
-    }
-    return DASH;
-}
-
 static void send_message_task(void *arg){
     (void)arg;
 
+    uint8_t index = 0;
+
     for(;;){
-        tight_loop_contents(); // comment out
-
-
         if (programState == MESSAGE_READY) {
             // Sends message stored in a global variable when writing message is finished with 3 spaces.
-
+            putchar(message[index]);
+            index++;
+            if (index >= message_length) {
+                message_clear();
+                index = 0;
+                programState = RECEIVING_MESSAGE;
+            }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
@@ -154,13 +159,19 @@ static void receive_message_task(void *arg){
     (void)arg;
 
     for(;;){
-        tight_loop_contents(); // comment out
-
         if (programState == RECEIVING_MESSAGE) {
             // Receives message from workstation.
+            char receivedCharacter = (char)getchar_timeout_us(0);
+            if (receivedCharacter != PICO_ERROR_TIMEOUT) {
+                message_append(receivedCharacter);
+                if (receivedCharacter == '\n') {
+                    message[message_length - 1] = '\0';
+                    programState = DISPLAY_MESSAGE;                    
+                }
+            }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
@@ -220,6 +231,8 @@ int main() {
     gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
     init_button2();
     gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+
+    stdio_usb_init();
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
     // Create the tasks with xTaskCreate
