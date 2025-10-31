@@ -51,16 +51,16 @@ static void message_clear() {
     message_length = 0;
 }
 
-//volatile bool button1IsPressed = false;
+volatile bool button1IsPressed = false;
 volatile bool button2IsPressed = false;
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
-    //changes the global value of button 1 or 2 to true if pressed. These values could be used in sensor_task when capturing the values from actuators.
-    // The button 1 is not working so using only button 2
-    //if(gpio == BUTTON1) {
-    //    button1IsPressed = true;
-    //}
-    if(gpio == BUTTON2){
+    printf("btn_fxn: gpio=%u eventMask=0x%lu\n", gpio, eventMask);
+
+    if (gpio == BUTTON1) {
+        button1IsPressed = true;
+    }
+    if (gpio == BUTTON2) {
         button2IsPressed = true;
     }
 }
@@ -102,7 +102,7 @@ static void sensor_task(void *arg){
                     printf("Status: %d", readStatus);
                 }
             }
-            /*
+
             if (button1IsPressed) {
                 switch (message_append(SPACE)) {
                     case OK:
@@ -112,9 +112,8 @@ static void sensor_task(void *arg){
                         printf("Sending message\n"); 
                         break;
                 }
-                button2IsPressed = false;
-            }*/
-
+                button1IsPressed = false;
+            }
         }
         
         vTaskDelay(pdMS_TO_TICKS(500));
@@ -215,10 +214,10 @@ int main() {
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
     // button initializtions + interruption handelers
-    //(Not sure if this work. Also haven't found anything for GPIO_IRQ_EDGE_RISE)
-    // The button 1 seems to be broken or something. Using only button 2 for now.
-    //init_button1();
-    //gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_FALL, true, btn_fxn);
+    // TODO: test button 1 if it works
+    init_button1();
+    gpio_pull_down(SW1_PIN);
+    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
     init_button2();
     gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
 
