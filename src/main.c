@@ -80,10 +80,26 @@ static void sensor_task(void *arg){
             if (button2IsPressed) {
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
-                    // TODO: handle sensor position and append corresponding character
+                    //printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
 
-                    // Placeholder print
-                    printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
+                    float gyroPositionSum = gx + gy + gz;
+                    // Range is based on measurements. When device is on table, the sum is > -0.5 and < 0
+                    float dotMinSum = -0.5;
+                    float dotMaxSum = 0;
+                    Status messageStatus;
+                    if (gyroPositionSum > dotMinSum && gyroPositionSum < dotMaxSum) {
+                        messageStatus = message_append(DOT);
+                    } else {
+                        messageStatus = message_append(DASH);
+                    }
+                    switch (messageStatus) {
+                        case OK:
+                            break;
+                        case MESSAGE_FULL:
+                            programState = MESSAGE_READY;
+                            printf("Sending message\n"); 
+                            break;
+                    }
 
                     button2IsPressed = false;
                 } else {
