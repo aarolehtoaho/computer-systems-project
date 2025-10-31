@@ -19,34 +19,47 @@
 #define SPACE ' '
 
 typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
-
 State programState = WRITING_MESSAGE;
 
+typedef enum { OK, INVALID_CHARACTER, MESSAGE_FULL} Status ;
 char message[MESSAGE_MAX_LENGTH];
 uint8_t message_length = 0;
 
-//static void message_append(Character c) {}
+static Status message_append(char character) {
+    bool isValidCharacter = character == DOT || character == DASH || character == SPACE;
+    if (!isValidCharacter) {
+        return INVALID_CHARACTER;
+    }
+    if (message_length >= MESSAGE_MAX_LENGTH) {
+        return MESSAGE_FULL;
+    }
+    message[message_length] = character;
+    message_length++;
+    return OK;
+}
 static void message_clear() {
     message_length = 0;
 }
 
-volatile bool button1value = false;
-volatile bool button2value = false;
+volatile bool button1IsPressed = false;
+volatile bool button2IsPressed = false;
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
     //changes the global value of button 1 or 2 to true if pressed. These values could be used in sensor_task when capturing the values from actuators.
     //the rising edge should trigger the interrupt immediately when the button is pressed? 
     if (eventMask & GPIO_IRQ_EDGE_RISE){
         if(gpio == BUTTON1) {
-            button1value = true;
+            button1IsPressed = true;
         }else if(gpio == BUTTON2){
-            button2value = true;
+            button2IsPressed = true;
         }
     }
 }
 
 static void sensor_task(void *arg){
     (void)arg;
+
+    init_ICM42670();
 
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
@@ -57,9 +70,28 @@ static void sensor_task(void *arg){
         if (programState == WRITING_MESSAGE) {
             // Adds a character in message based on device position when button 1 is pressed and writes a space when button 2 is pressed.
 
+            if (button1IsPressed && ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t) == 0) {
+                // TODO: handle sensor position and append corresponding character
+
+                // Placeholder print
+                printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
+
+                button1IsPressed = false;
+            }
+            if (button2IsPressed) {
+                // TODO: handle full message
+                switch (message_append(SPACE)) {
+                    case OK:
+                        break;
+                    case MESSAGE_FULL:
+                        break;
+                }
+                button2IsPressed = false;
+            }
+
         }
         
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
