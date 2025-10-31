@@ -33,6 +33,12 @@ static Status message_append(char character) {
     if (message_length >= MESSAGE_MAX_LENGTH) {
         return MESSAGE_FULL;
     }
+    if (character == SPACE && message_length > 1) {
+        bool isThridSpace = message[message_length - 1] == SPACE && message[message_length - 2] == SPACE;
+        if (isThridSpace) {
+            return MESSAGE_FULL;
+        }
+    }
     message[message_length] = character;
     message_length++;
     return OK;
@@ -84,6 +90,7 @@ static void sensor_task(void *arg){
                     case OK:
                         break;
                     case MESSAGE_FULL:
+                        programState = MESSAGE_READY;
                         break;
                 }
                 button2IsPressed = false;
