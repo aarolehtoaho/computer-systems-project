@@ -51,12 +51,11 @@ static void message_clear() {
     message_length = 0;
 }
 
-volatile bool button1IsPressed = false;
-volatile bool button2IsPressed = false;
+static volatile uint8_t button1IsPressed, button2IsPressed;
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
     printf("btn_fxn: gpio=%u eventMask=0x%lu\n", gpio, eventMask);
-
+    
     if (gpio == BUTTON1) {
         button1IsPressed = true;
     }
@@ -227,10 +226,9 @@ int main() {
     // button initializtions + interruption handelers
     // TODO: test button 1 if it works
     init_button1();
-    gpio_pull_down(SW1_PIN);
-    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
     init_button2();
-    gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true);
 
     stdio_usb_init();
 
