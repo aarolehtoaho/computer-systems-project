@@ -1,29 +1,40 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-
 #include <pico/stdlib.h>
-
 #include <FreeRTOS.h>
 #include <queue.h>
 #include <task.h>
-
 #include "tkjhat/sdk.h"
 
 // Default stack size for the tasks. It can be reduced to 1024 if task is not using lot of memory.
 #define DEFAULT_STACK_SIZE 2048
 #define MESSAGE_MAX_LENGTH 256
-
 #define DOT '.'
 #define DASH '-'
 #define SPACE ' '
 
 typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
-State programState = WRITING_MESSAGE;
-
 typedef enum { OK, INVALID_CHARACTER, MESSAGE_FULL} Status ;
+
+// Tasks
+static void sensor_task(void *arg);
+static void send_message_task(void *arg);
+static void receive_message_task(void *arg);
+static void actuator_task(void *arg);
+// Callbacks
+static void btn_fxn(uint gpio, uint32_t eventMask);
+// Helper functions
+static Status message_append(char character);
+static void message_clear();
+static char getCharByPosition(float gx, float gy, float gz);
+
+// Global variables
+State programState = WRITING_MESSAGE;
 char message[MESSAGE_MAX_LENGTH];
 uint8_t message_length = 0;
+static volatile uint8_t button1IsPressed, button2IsPressed;
+
 
 static Status message_append(char character) {
     bool isValidCharacter = character == DOT || character == DASH || character == SPACE;
@@ -50,8 +61,6 @@ static Status message_append(char character) {
 static void message_clear() {
     message_length = 0;
 }
-
-static volatile uint8_t button1IsPressed, button2IsPressed;
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
     printf("btn_fxn: gpio=%u eventMask=0x%lu\n", gpio, eventMask);
@@ -216,10 +225,6 @@ static void actuator_task(void *arg){
 
 int main() {
     stdio_init_all();
-    // Uncomment this lines if you want to wait till the serial monitor is connected
-    /*while (!stdio_usb_connected()){
-        sleep_ms(10);
-    }*/ 
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
@@ -228,12 +233,11 @@ int main() {
     init_button1();
     init_button2();
     gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
-    gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_irq_enabled(BUTTON2, GPIO_IRQ_EDGE_RISE, true);
 
     stdio_usb_init();
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
-    // Create the tasks with xTaskCreate
     BaseType_t result = xTaskCreate(sensor_task,       // (en) Task function
                 "sensor",              // (en) Name of the task 
                 DEFAULT_STACK_SIZE, // (en) Size of the stack for this task (in words). Generally 1024 or 2048
