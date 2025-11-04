@@ -47,8 +47,8 @@ static Status message_append(char character) {
         return MESSAGE_FULL;
     }
     if (character == SPACE && message_length > 1) {
-        bool isThridSpace = message[message_length - 1] == SPACE && message[message_length - 2] == SPACE;
-        if (isThridSpace) {
+        bool isThirdSpace = message[message_length - 1] == SPACE && message[message_length - 2] == SPACE;
+        if (isThirdSpace) {
             message[message_length] = '\n';
             message_length++;
             return MESSAGE_FULL;
@@ -59,6 +59,8 @@ static Status message_append(char character) {
     return OK;
 }
 static void message_clear() {
+    //clears every character of the message
+    memset(message, 0, sizeof(message));
     message_length = 0;
 }
 
