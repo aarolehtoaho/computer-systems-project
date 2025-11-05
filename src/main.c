@@ -33,8 +33,8 @@ static char getCharByPosition(float gx, float gy, float gz);
 State programState = WRITING_MESSAGE;
 char message[MESSAGE_MAX_LENGTH];
 uint8_t message_length = 0;
-static volatile uint8_t button1IsPressed, button2IsPressed;
-
+volatile bool button1IsPressed = false;
+volatile bool button2IsPressed = false;
 
 static Status message_append(char character) {
     bool isValidCharacter = character == DOT || character == DASH || character == SPACE;
@@ -67,11 +67,15 @@ static void message_clear() {
 static void btn_fxn(uint gpio, uint32_t eventMask){
     printf("btn_fxn: gpio=%u eventMask=0x%lu\n", gpio, eventMask);
     
-    if (gpio == BUTTON1) {
-        button1IsPressed = true;
-    }
-    if (gpio == BUTTON2) {
-        button2IsPressed = true;
+    switch (gpio) {
+        case BUTTON1:
+            button1IsPressed = true;
+            break;
+        case BUTTON2:
+            button2IsPressed = true;
+            break;
+        default:
+            printf("Unknown gpio");
     }
 }
 
@@ -92,12 +96,6 @@ static char getCharByPosition(float gx, float gy, float gz) {
 static void sensor_task(void *arg){
     (void)arg;
 
-    if (init_ICM42670() == OK) {
-        ICM42670_start_with_default_values();
-    } else {
-        printf("Failed to initialize ICM42670");
-    }
-
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
 
@@ -108,8 +106,9 @@ static void sensor_task(void *arg){
             if (button2IsPressed) {
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
-                    //printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
+                    printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
                     char character = getCharByPosition(gx, gy, gz);
+                    printf("Character: %c", character);
                     Status messageStatus = message_append(character);
                     switch (messageStatus) {
                         case OK:
@@ -161,7 +160,7 @@ static void send_message_task(void *arg){
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(200));
+        vTaskDelay(pdMS_TO_TICKS(400));
     }
 }
 
@@ -181,7 +180,7 @@ static void receive_message_task(void *arg){
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(200));
+        vTaskDelay(pdMS_TO_TICKS(400));
     }
 }
 
@@ -190,7 +189,9 @@ static void actuator_task(void *arg){
 
     init_display();
     init_buzzer();
+
     int textBeginIndex = 0;
+    clear_display();
 
     for(;;){
         if (programState == DISPLAY_MESSAGE) {
@@ -237,16 +238,15 @@ int main() {
     gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
     gpio_set_irq_enabled(BUTTON2, GPIO_IRQ_EDGE_RISE, true);
 
+    if (init_ICM42670() == OK) {
+        ICM42670_start_with_default_values();
+    }
+
     stdio_usb_init();
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
-    BaseType_t result = xTaskCreate(sensor_task,       // (en) Task function
-                "sensor",              // (en) Name of the task 
-                DEFAULT_STACK_SIZE, // (en) Size of the stack for this task (in words). Generally 1024 or 2048
-                NULL,               // (en) Arguments of the task 
-                2,                  // (en) Priority of this task
-                &hSensorTask);    // (en) A handle to control the execution of this task
 
+    BaseType_t result = xTaskCreate(sensor_task, "sensor", DEFAULT_STACK_SIZE, NULL, 2, &hSensorTask);
     if(result != pdPASS) {
         printf("Sensor Task creation failed\n");
         return 0;
