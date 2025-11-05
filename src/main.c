@@ -80,19 +80,22 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
 }
 
 static char getCharByPosition(float gx, float gy, float gz) {
-    // TODO: improve the logic based on measurements. Current logic is not accurate enough
-
-    // Initial logic for assigning character for a position.
-    // With taken measurements from the gyro, the sum of x, y and z was
-    // between range of -0.5 to 0. The range can be adjusted or
-    // the logic can be changed completely.
-    float gyroPositionSum = gx + gy + gz;
-    float dotMinSum = -0.5;
-    float dotMaxSum = 0;
-    if (gyroPositionSum > dotMinSum && gyroPositionSum < dotMaxSum) {
-        return DOT;
-    }
-    return DASH;
+    /*
+    Based on measurements while device is on table:
+        sum: gx + gy + gz 
+            -> max: 4.050, min: -1.790
+        average: (gx + gy + gz)/3 
+            -> max: 1.350, min: -0.118
+        product: gx * gy * gz
+            -> max: 1.970, min: -0.938
+    Using averege for the logic seems most accurate when compared
+    to measurements taken from device not on table.
+    */
+    float gyroPositionAverage = (gx + gy + gz) / 3;
+    float minAverageOnTable = -0.118;
+    float maxAverageOnTable = 1.35;
+    bool deviceOnTable = gyroPositionAverage > minAverageOnTable && gyroPositionAverage < maxAverageOnTable;
+    return deviceOnTable ? DOT : DASH;
 }
 
 static void sensor_task(void *arg){
