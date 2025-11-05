@@ -33,8 +33,8 @@ static char getCharByPosition(float gx, float gy, float gz);
 State programState = WRITING_MESSAGE;
 char message[MESSAGE_MAX_LENGTH];
 uint8_t message_length = 0;
-volatile bool button1IsPressed = false;
-volatile bool button2IsPressed = false;
+volatile bool spaceButtonIsPressed = false;
+volatile bool characterButtonIsPressed = false;
 
 static Status message_append(char character) {
     bool isValidCharacter = character == DOT || character == DASH || character == SPACE;
@@ -43,6 +43,8 @@ static Status message_append(char character) {
     }
     if (message_length >= MESSAGE_MAX_LENGTH - 1) {
         message[MESSAGE_MAX_LENGTH - 1] = '\n';
+        message[MESSAGE_MAX_LENGTH - 2] = ' ';
+        message[MESSAGE_MAX_LENGTH - 3] = ' ';
         message_length++;
         return MESSAGE_FULL;
     }
@@ -67,10 +69,10 @@ static void message_clear() {
 static void btn_fxn(uint gpio, uint32_t eventMask){
     switch (gpio) {
         case BUTTON1:
-            button1IsPressed = true;
+            spaceButtonIsPressed = true;
             break;
         case BUTTON2:
-            button2IsPressed = true;
+            characterButtonIsPressed = true;
             break;
         default:
             printf("Unknown gpio");
@@ -78,6 +80,8 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
 }
 
 static char getCharByPosition(float gx, float gy, float gz) {
+    // TODO: improve the logic based on measurements. Current logic is not accurate enough
+
     // Initial logic for assigning character for a position.
     // With taken measurements from the gyro, the sum of x, y and z was
     // between range of -0.5 to 0. The range can be adjusted or
@@ -99,9 +103,8 @@ static void sensor_task(void *arg){
 
     for(;;){
         if (programState == WRITING_MESSAGE) {
-            // Adds a character in message based on device position when button 1 is pressed and writes a space when button 2 is pressed.
-
-            if (button2IsPressed) {
+            if (characterButtonIsPressed) {
+                // Adds a character in message based on device position
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
                     //printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
@@ -113,27 +116,24 @@ static void sensor_task(void *arg){
                             break;
                         case MESSAGE_FULL:
                             programState = MESSAGE_READY;
-                            printf("Sending message\n"); 
                             break;
                     }
-
-                    button2IsPressed = false;
+                    characterButtonIsPressed = false;
                 } else {
                     printf("Cannot read sensor");
                     printf("Status: %d", readStatus);
                 }
             }
 
-            if (button1IsPressed) {
+            if (spaceButtonIsPressed) {
                 switch (message_append(SPACE)) {
                     case OK:
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
-                        printf("Sending message\n"); 
                         break;
                 }
-                button1IsPressed = false;
+                spaceButtonIsPressed = false;
             }
         }
         
@@ -146,9 +146,11 @@ static void send_message_task(void *arg){
 
     uint8_t index = 0;
 
+    // TODO: Sending message does not work properly. While using serialclient on workstation, the message is not displayed.
+
     for(;;){
         if (programState == MESSAGE_READY) {
-            // Sends message stored in a global variable when writing message is finished with 3 spaces.
+            // Sends message stored in a global variable 'message'
             putchar(message[index]);
             index++;
             if (index >= message_length) {
@@ -165,9 +167,11 @@ static void send_message_task(void *arg){
 static void receive_message_task(void *arg){
     (void)arg;
 
+    // TODO: Does not work properly. When state changes to RECEIVING_MESSAGE, no characters are
+    // written in 'message' and state almost immediately changes to DISPLAY_MESSAGE.
+
     for(;;){
         if (programState == RECEIVING_MESSAGE) {
-            // Receives message from workstation.
             char receivedCharacter = (char)getchar_timeout_us(0);
             if (receivedCharacter != PICO_ERROR_TIMEOUT) {
                 message_append(receivedCharacter);
@@ -230,7 +234,6 @@ int main() {
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
     // button initializtions + interruption handelers
-    // TODO: test button 1 if it works
     init_button1();
     init_button2();
     gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
