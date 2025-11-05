@@ -65,8 +65,6 @@ static void message_clear() {
 }
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
-    printf("btn_fxn: gpio=%u eventMask=0x%lu\n", gpio, eventMask);
-    
     switch (gpio) {
         case BUTTON1:
             button1IsPressed = true;
@@ -106,9 +104,9 @@ static void sensor_task(void *arg){
             if (button2IsPressed) {
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
-                    printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
+                    //printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
                     char character = getCharByPosition(gx, gy, gz);
-                    printf("Character: %c", character);
+                    //printf("Character: %c", character);
                     Status messageStatus = message_append(character);
                     switch (messageStatus) {
                         case OK:
