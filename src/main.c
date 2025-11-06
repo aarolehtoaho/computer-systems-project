@@ -160,20 +160,32 @@ static void send_message_task(void *arg){
 
     // TODO: Sending message does not work properly. While using serialclient on workstation, the message is not displayed.
 
+    // Added validation check, error handeling, and reduced delay time from 400 to 300
+
     for(;;){
         if (programState == MESSAGE_READY) {
+            // Checks wheter the received message is valid
+            if(message != NULL && messageLength > 0) {
             // Sends message stored in a global variable 'message'
             putchar(message[index]);
             index++;
-            if (index >= messageLength) {
+                if (index >= messageLength) {
+                    message_clear();
+                    index = 0;
+                    programState = RECEIVING_MESSAGE;
+                    debug_print("Receiving message from workstation");
+                }
+            } 
+            else {
+                // If message is not valid, it is cleared and reset
+                printf("Invalid message");
                 message_clear();
                 index = 0;
                 programState = RECEIVING_MESSAGE;
-                debug_print("Receiving message from workstation");
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(400));
+        vTaskDelay(pdMS_TO_TICKS(300));
     }
 }
 
