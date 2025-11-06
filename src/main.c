@@ -27,7 +27,9 @@ static void btn_fxn(uint gpio, uint32_t eventMask);
 // Helper functions
 static Status message_append(char character);
 static void message_clear();
-static char getCharByPosition(float gx, float gy, float gz);
+static char get_char_by_position(float gx, float gy, float gz);
+// Util
+static void debug_print(char *text);
 
 // Global variables
 State programState = WRITING_MESSAGE;
@@ -75,11 +77,11 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
             characterButtonIsPressed = true;
             break;
         default:
-            printf("Unknown gpio");
+            debug_print("Unknown gpio");
     }
 }
 
-static char getCharByPosition(float gx, float gy, float gz) {
+static char get_char_by_position(float gx, float gy, float gz) {
     /*
     Based on measurements while device is on table:
         sum: gx + gy + gz 
@@ -110,21 +112,27 @@ static void sensor_task(void *arg){
                 // Adds a character in message based on device position
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
-                    //printf("Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C\n", ax, ay, az, gx, gy, gz, t);
-                    char character = getCharByPosition(gx, gy, gz);
-                    //printf("Character: %c", character);
+                    char character = get_char_by_position(gx, gy, gz);
+
+                    char gyroValues[65];
+                    sprintf(gyroValues, "Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C", ax, ay, az, gx, gy, gz, t);
+                    debug_print(gyroValues);
+                    char addedCharacter[20];
+                    sprintf(addedCharacter, "Added character: %c", character);
+                    debug_print(addedCharacter);
+
                     Status messageStatus = message_append(character);
                     switch (messageStatus) {
                         case OK:
                             break;
                         case MESSAGE_FULL:
                             programState = MESSAGE_READY;
+                            debug_print("Sending message");
                             break;
                     }
                     characterButtonIsPressed = false;
                 } else {
-                    printf("Cannot read sensor");
-                    printf("Status: %d", readStatus);
+                    debug_print("Cannot read sensor");
                 }
             }
 
@@ -134,6 +142,7 @@ static void sensor_task(void *arg){
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
+                        debug_print("Sending message");
                         break;
                 }
                 spaceButtonIsPressed = false;
@@ -160,6 +169,7 @@ static void send_message_task(void *arg){
                 message_clear();
                 index = 0;
                 programState = RECEIVING_MESSAGE;
+                debug_print("Receiving message from workstation");
             }
         }
         
@@ -180,7 +190,8 @@ static void receive_message_task(void *arg){
                 message_append(receivedCharacter);
                 if (receivedCharacter == '\n') {
                     message[message_length - 1] = '\0';
-                    programState = DISPLAY_MESSAGE;                    
+                    programState = DISPLAY_MESSAGE;
+                    debug_print("Displaying message on lcd screen");                  
                 }
             }
         }
@@ -224,11 +235,17 @@ static void actuator_task(void *arg){
                 message_clear();
                 buzzer_play_tone(440, 500);
                 programState = WRITING_MESSAGE;
+                debug_print("Message displayed");
             }
         }
 
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+static void debug_print(char *text) {
+    // Serial client does not decode text between __
+    printf("__\n%s\n__", *text);
 }
 
 int main() {
@@ -252,25 +269,25 @@ int main() {
 
     BaseType_t result = xTaskCreate(sensor_task, "sensor", DEFAULT_STACK_SIZE, NULL, 2, &hSensorTask);
     if(result != pdPASS) {
-        printf("Sensor Task creation failed\n");
+        debug_print("Sensor Task creation failed\n");
         return 0;
     }
 
     result = xTaskCreate(send_message_task, "send_message", DEFAULT_STACK_SIZE, NULL, 2, &hSendMessageTask);
     if(result != pdPASS) {
-        printf("Send Message Task creation failed\n");
+        debug_print("Send Message Task creation failed\n");
         return 0;
     }
 
     result = xTaskCreate(receive_message_task, "receive_message", DEFAULT_STACK_SIZE, NULL, 2, &hReceiveMessageTask);
     if(result != pdPASS) {
-        printf("Receive Message Task creation failed\n");
+        debug_print("Receive Message Task creation failed\n");
         return 0;
     }
 
     result = xTaskCreate(actuator_task, "actuator", DEFAULT_STACK_SIZE, NULL, 2, &hActuatorTask);
     if(result != pdPASS) {
-        printf("Actuator Task creation failed\n");
+        debug_print("Actuator Task creation failed\n");
         return 0;
     }
 
