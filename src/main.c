@@ -34,7 +34,7 @@ static void debug_print(char *text);
 // Global variables
 State programState = WRITING_MESSAGE;
 char message[MESSAGE_MAX_LENGTH];
-uint8_t message_length = 0;
+uint8_t messageLength = 0;
 volatile bool spaceButtonIsPressed = false;
 volatile bool characterButtonIsPressed = false;
 
@@ -43,29 +43,29 @@ static Status message_append(char character) {
     if (!isValidCharacter) {
         return INVALID_CHARACTER;
     }
-    if (message_length >= MESSAGE_MAX_LENGTH - 1) {
+    if (messageLength >= MESSAGE_MAX_LENGTH - 1) {
         message[MESSAGE_MAX_LENGTH - 1] = '\n';
         message[MESSAGE_MAX_LENGTH - 2] = ' ';
         message[MESSAGE_MAX_LENGTH - 3] = ' ';
-        message_length++;
+        messageLength++;
         return MESSAGE_FULL;
     }
-    if (character == SPACE && message_length > 1) {
-        bool isThirdSpace = message[message_length - 1] == SPACE && message[message_length - 2] == SPACE;
+    if (character == SPACE && messageLength > 1) {
+        bool isThirdSpace = message[messageLength - 1] == SPACE && message[messageLength - 2] == SPACE;
         if (isThirdSpace) {
-            message[message_length] = '\n';
-            message_length++;
+            message[messageLength] = '\n';
+            messageLength++;
             return MESSAGE_FULL;
         }
     }
-    message[message_length] = character;
-    message_length++;
+    message[messageLength] = character;
+    messageLength++;
     return OK;
 }
 static void message_clear() {
     //clears every character of the message
     memset(message, 0, sizeof(message));
-    message_length = 0;
+    messageLength = 0;
 }
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
@@ -165,7 +165,7 @@ static void send_message_task(void *arg){
             // Sends message stored in a global variable 'message'
             putchar(message[index]);
             index++;
-            if (index >= message_length) {
+            if (index >= messageLength) {
                 message_clear();
                 index = 0;
                 programState = RECEIVING_MESSAGE;
@@ -189,7 +189,7 @@ static void receive_message_task(void *arg){
             if (receivedCharacter != PICO_ERROR_TIMEOUT) {
                 message_append(receivedCharacter);
                 if (receivedCharacter == '\n') {
-                    message[message_length - 1] = '\0';
+                    message[messageLength - 1] = '\0';
                     programState = DISPLAY_MESSAGE;
                     debug_print("Displaying message on lcd screen");                  
                 }
@@ -215,27 +215,44 @@ static void actuator_task(void *arg){
 
             // Max amount of characters displayed is 10. If there is less
             // characters after begin index, the amount is reduced.
-            int8_t display_text_length = 10;
-            int8_t lastIndex = display_text_length + textBeginIndex;
-            if (lastIndex > message_length) {
-                int8_t overflow = lastIndex - message_length;
-                display_text_length -= overflow;
+            int8_t displayTextLength = 10;
+            int8_t lastIndex = displayTextLength + textBeginIndex;
+            if (lastIndex > messageLength) {
+                int8_t overflow = lastIndex - messageLength;
+                displayTextLength -= overflow;
             }
 
-            char display_text[display_text_length + 1];
-            strncpy(display_text, message + textBeginIndex, display_text_length);
-            display_text[display_text_length] = '\0';
+            // Write text from the message between current range
+            char display_text[displayTextLength + 1];
+            strncpy(display_text, message + textBeginIndex, displayTextLength);
+            display_text[displayTextLength] = '\0';
             write_text(display_text);
 
+            // Play sound for the first letter written
+            char firstLetter = display_text[0];
+            switch (firstLetter) {
+            case DOT:
+                buzzer_play_tone(440, 100);
+                break;
+            case DASH:
+                buzzer_play_tone(350, 150);
+                break;
+            default:
+                break;
+            }
+
             textBeginIndex++;
-            bool wholeMessageDisplayed = textBeginIndex >= message_length;
+            bool wholeMessageDisplayed = textBeginIndex >= messageLength;
             if (wholeMessageDisplayed) {
                 textBeginIndex = 0;
                 clear_display();
                 message_clear();
-                buzzer_play_tone(440, 500);
                 programState = WRITING_MESSAGE;
                 debug_print("Message displayed");
+
+                gpio_put(RED_LED_PIN, true);
+                buzzer_play_tone(440, 500);
+                gpio_put(RED_LED_PIN, false);
             }
         }
 
@@ -264,6 +281,7 @@ int main() {
     }
 
     stdio_usb_init();
+    init_led();
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
 
