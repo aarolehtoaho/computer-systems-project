@@ -168,8 +168,19 @@ static void send_message_task(void *arg){
             if(message != NULL && messageLength > 0) {
             // Sends message stored in a global variable 'message'
             putchar(message[index]);
+
+            /*
+            //this could also be used alternatively:
+            for (uint8_t i = 0; i < messageLength; i++) {
+                putchar(message[i]);
+                }
+            */
+
+            fflush(stdout); //clears output buffer
             index++;
                 if (index >= messageLength) {
+                    putchar("\n"); //so that the program knows when the message ends
+                    fflush(stdout);
                     message_clear();
                     index = 0;
                     programState = RECEIVING_MESSAGE;
@@ -197,10 +208,10 @@ static void receive_message_task(void *arg){
 
     for(;;){
         if (programState == RECEIVING_MESSAGE) {
-            char receivedCharacter = (char)getchar_timeout_us(0);
+            int receivedCharacter = getchar_timeout_us(100000); //should be tried with slight delay (100ms)
             if (receivedCharacter != PICO_ERROR_TIMEOUT) {
-                message_append(receivedCharacter);
-                if (receivedCharacter == '\n') {
+                message_append((char)receivedCharacter);
+                if ((char)receivedCharacter == '\n') {
                     message[messageLength - 1] = '\0';
                     programState = DISPLAY_MESSAGE;
                     debug_print("Displaying message on lcd screen");                  
@@ -274,11 +285,12 @@ static void actuator_task(void *arg){
 
 static void debug_print(char *text) {
     // Serial client does not decode text between __
-    printf("__\n%s\n__", *text);
+    printf("__\n%s\n__", *text); // if this doesnt work, could try removing * before text in the printf.
 }
 
 int main() {
     stdio_init_all();
+    stdio_usb_init(); //is this necessary bcz we did init_all already?
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
@@ -292,7 +304,6 @@ int main() {
         ICM42670_start_with_default_values();
     }
 
-    stdio_usb_init();
     init_led();
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
@@ -328,3 +339,4 @@ int main() {
     return 0;
 }
 
+ 
