@@ -160,36 +160,34 @@ static void send_message_task(void *arg){
 
     // TODO: Sending message does not work properly. While using serialclient on workstation, the message is not displayed.
 
-    // Added validation check, error handeling, and reduced delay time from 400 to 300
+    // Another possible method is to send the whole message instantly and not just character at a time
+
+    /*
+    //this could also be used alternatively:
+    for (uint8_t i = 0; i < messageLength; i++) {
+        putchar(message[i]);
+        }
+    */
+    //puts(message); // or this
 
     for(;;){
         if (programState == MESSAGE_READY) {
             // Checks wheter the received message is valid
             if(message != NULL && messageLength > 0) {
-            // Sends message stored in a global variable 'message'
-            putchar(message[index]);
-
-            /*
-            //this could also be used alternatively:
-            for (uint8_t i = 0; i < messageLength; i++) {
-                putchar(message[i]);
-                }
-            */
-
-            fflush(stdout); //clears output buffer
-            index++;
+                // Sends message stored in a global variable 'message'
+                putchar(message[index++]);
+                fflush(stdout); //clears output buffer
                 if (index >= messageLength) {
-                    putchar("\n"); //so that the program knows when the message ends
+                    putchar('\n'); // Is this necessary because message_append adds '\n' when message is finished?
                     fflush(stdout);
                     message_clear();
                     index = 0;
                     programState = RECEIVING_MESSAGE;
                     debug_print("Receiving message from workstation");
                 }
-            } 
-            else {
+            } else {
                 // If message is not valid, it is cleared and reset
-                printf("Invalid message");
+                debug_print("Invalid message");
                 message_clear();
                 index = 0;
                 programState = RECEIVING_MESSAGE;
@@ -212,7 +210,7 @@ static void receive_message_task(void *arg){
             if (receivedCharacter != PICO_ERROR_TIMEOUT) {
                 message_append((char)receivedCharacter);
                 if ((char)receivedCharacter == '\n') {
-                    message[messageLength - 1] = '\0';
+                    message[messageLength] = '\0';
                     programState = DISPLAY_MESSAGE;
                     debug_print("Displaying message on lcd screen");                  
                 }
@@ -285,12 +283,12 @@ static void actuator_task(void *arg){
 
 static void debug_print(char *text) {
     // Serial client does not decode text between __
-    printf("__\n%s\n__", *text); // if this doesnt work, could try removing * before text in the printf.
+    printf("__\n%s\n__", text);
 }
 
 int main() {
     stdio_init_all();
-    stdio_usb_init(); //is this necessary bcz we did init_all already?
+    //stdio_usb_init();
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
