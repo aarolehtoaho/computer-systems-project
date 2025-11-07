@@ -138,9 +138,6 @@ static void sensor_task(void *arg){
                                 case DASH:
                                     buzzer_play_tone(350, 150);
                                     break;
-                                case SPACE:
-                                    buzzer_play_tone(250, 100);
-                                    break;
                             }
                             break;
                         case MESSAGE_FULL:
@@ -157,6 +154,8 @@ static void sensor_task(void *arg){
             if (spaceButtonIsPressed) {
                 switch (message_append(SPACE)) {
                     case OK:
+                        buzzer_play_tone(250, 100);
+                        break;                    
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
@@ -174,7 +173,7 @@ static void sensor_task(void *arg){
 static void send_message_task(void *arg){
     (void)arg;
 
-    uint8_t index = 0;
+    //uint8_t index = 0;
 
     // Does not work properly. With message: ". -  \n" serial client prints " ???????????e ?  \n" but it should be "te  \n"
 
@@ -184,12 +183,8 @@ static void send_message_task(void *arg){
             if(message != NULL && messageLength > 0) {
                 //send_message_by_characters(index);
                 puts(message);
-                messageLength = 0;
-            } else {
-                // If message is not valid, it is cleared and reset
-                debug_print("Invalid message");
                 message_clear();
-                index = 0;
+            } else {
                 programState = RECEIVING_MESSAGE;
             }
         }
