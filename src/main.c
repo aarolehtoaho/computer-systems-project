@@ -110,8 +110,15 @@ static void sensor_task(void *arg){
     // TODO: before changing state to sending message, checking message for correct character combinations prevents
     // serialclient to not recognize wrong character combinations and printing ?:s
 
+    message_clear();
+
     for(;;){
         if (programState == WRITING_MESSAGE) {
+            if (messageLength == 0) {
+                // Serial client always displays ?s for the first letter. Adding random first letter automatically and just ignoring the ?s
+                message_append(DASH);
+                message_append(SPACE);
+            }
             if (characterButtonIsPressed) {
                 // Adds a character in message based on device position
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
@@ -139,6 +146,10 @@ static void sensor_task(void *arg){
                                     buzzer_play_tone(350, 150);
                                     break;
                             }
+                            clear_display();
+                            char addedCharacter[2];
+                            sprintf(addedCharacter, "%c", character);
+                            write_text(addedCharacter);                            
                             break;
                         case MESSAGE_FULL:
                             programState = MESSAGE_READY;
@@ -155,7 +166,7 @@ static void sensor_task(void *arg){
                 switch (message_append(SPACE)) {
                     case OK:
                         buzzer_play_tone(250, 100);
-                        break;                    
+                        clear_display();                 
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
@@ -175,12 +186,10 @@ static void send_message_task(void *arg){
 
     //uint8_t index = 0;
 
-    // Does not work properly. With message: ". -  \n" serial client prints " ???????????e ?  \n" but it should be "te  \n"
-
     for(;;){
         if (programState == MESSAGE_READY) {
             // Checks wheter the received message is valid
-            if(message != NULL && messageLength > 0) {
+            if(message != NULL && messageLength > 2) {
                 //send_message_by_characters(index);
                 puts(message);
                 message_clear();
@@ -289,7 +298,7 @@ static void actuator_task(void *arg){
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
