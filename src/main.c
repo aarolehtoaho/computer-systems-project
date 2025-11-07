@@ -85,20 +85,11 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
 }
 
 static char get_char_by_position(float gx, float gy, float gz) {
-    /*
-    TODO: imporve the logic because currently the average or its range is not accurate enough
-    Based on measurements while device is on table:
-        sum: gx + gy + gz 
-            -> max: 4.050, min: -1.790
-        average: (gx + gy + gz)/3 
-            -> max: 1.350, min: -0.118
-        product: gx * gy * gz
-            -> max: 1.970, min: -0.938
-    */
-    float gyroPositionAverage = (gx + gy + gz) / 3;
-    float minAverageOnTable = -0.118;
-    float maxAverageOnTable = 1.35;
-    bool deviceOnTable = gyroPositionAverage > minAverageOnTable && gyroPositionAverage < maxAverageOnTable;
+    // See docs/gyro_measurements.ods
+    float gyroPositionProduct = (gx + gy + gz) / 3;
+    float minProductOnTable = -1;
+    float maxProductOnTable = 1;
+    bool deviceOnTable = gyroPositionProduct > minProductOnTable && gyroPositionProduct < maxProductOnTable;
     return deviceOnTable ? DOT : DASH;
 }
 
