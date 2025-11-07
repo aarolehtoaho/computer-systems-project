@@ -28,7 +28,9 @@ static void btn_fxn(uint gpio, uint32_t eventMask);
 static Status message_append(char character);
 static void message_clear();
 static char get_char_by_position(float gx, float gy, float gz);
-static void send_message_by_character(int index);
+static void send_message_by_characters(int *index);
+static bool check_last_characters();
+static void clear_invalid_characters();
 // Util
 static void debug_print(char *text);
 
@@ -69,7 +71,7 @@ static void message_clear() {
 }
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
-    //space button does not work properly
+    // Sometimes space button does not work properly
     switch (gpio) {
         case BUTTON1:
             spaceButtonIsPressed = true;
@@ -84,6 +86,7 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
 
 static char get_char_by_position(float gx, float gy, float gz) {
     /*
+    TODO: imporve the logic because currently the average or its range is not accurate enough
     Based on measurements while device is on table:
         sum: gx + gy + gz 
             -> max: 4.050, min: -1.790
@@ -91,8 +94,6 @@ static char get_char_by_position(float gx, float gy, float gz) {
             -> max: 1.350, min: -0.118
         product: gx * gy * gz
             -> max: 1.970, min: -0.938
-    Using averege for the logic seems most accurate when compared
-    to measurements taken from device not on table.
     */
     float gyroPositionAverage = (gx + gy + gz) / 3;
     float minAverageOnTable = -0.118;
@@ -109,13 +110,15 @@ static void sensor_task(void *arg){
 
     // TODO: before changing state to sending message, checking message for correct character combinations prevents
     // serialclient to not recognize wrong character combinations and printing ?:s
+    // Implement check_last_characters and clear_invalid_characters
 
     message_clear();
 
     for(;;){
         if (programState == WRITING_MESSAGE) {
             if (messageLength == 0) {
-                // Serial client always displays ?s for the first letter. Adding random first letter automatically and just ignoring the ?s
+                // Serial client always displays ?s for the first letter. Adding random first
+                // letter automatically and just ignoring the prefix ?s on serial client
                 message_append(DASH);
                 message_append(SPACE);
             }
@@ -125,14 +128,10 @@ static void sensor_task(void *arg){
                 if (readStatus == OK) {
                     char character = get_char_by_position(gx, gy, gz);
 
-                     /*                   
-                    // debug prints
-                    char gyroValues[9];
-                    sprintf(gyroValues, "%f,%f,%f", gx, gy, gz);
-                    debug_print(gyroValues);
-                    char addedCharacter[20];
-                    sprintf(addedCharacter, "Added character: %c", character);
-                    debug_print(addedCharacter);
+                    /*
+                    char debugText[9];
+                    sprintf(debugText, "%f,%f,%f", gx, gy, gz);
+                    debug_print(debugText);
                     */
 
                     Status messageStatus = message_append(character);
@@ -161,12 +160,15 @@ static void sensor_task(void *arg){
                     debug_print("Cannot read sensor");
                 }
             }
-
             if (spaceButtonIsPressed) {
                 switch (message_append(SPACE)) {
                     case OK:
                         buzzer_play_tone(250, 100);
-                        clear_display();                 
+                        clear_display();
+                        bool validCharacterCombination = check_last_characters();
+                        if (!validCharacterCombination) {
+                            clear_invalid_characters();
+                        }
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
@@ -179,6 +181,17 @@ static void sensor_task(void *arg){
         
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+}
+
+static bool check_last_characters() {
+    // TODO: This function is called after appending a SPACE and checks
+    // if last character combination was valid or not.
+    return true;
+}
+
+static void clear_invalid_characters() {
+    // TODO: removes last character combination from message
+    return;
 }
 
 static void send_message_task(void *arg){
@@ -202,13 +215,14 @@ static void send_message_task(void *arg){
     }
 }
 
-static void send_message_by_characters(int index) {
-    putchar(message[index++]);
+static void send_message_by_characters(int *index) {
+    // Sending the whole message works better
+    putchar(message[*index++]);
     //fflush(stdout); //clears output buffer
-    if (index >= messageLength) {
+    if (*index >= messageLength) {
         fflush(stdout);
         message_clear();
-        index = 0;
+        *index = 0;
         programState = RECEIVING_MESSAGE;
         debug_print("Receiving message from workstation");
     }   
@@ -266,21 +280,21 @@ static void actuator_task(void *arg){
             char firstLetter = display_text[0];
 
             switch (firstLetter) {
-            case DOT:
-                buzzer_play_tone(440, 100);
-                break;
-            case DASH:
-                buzzer_play_tone(350, 150);
-                break;
-            case SPACE:
-                break;
-            case '\n':
-                break;
-            default:
-                char debugText[17];
-                sprintf(debugText, "Invalid character: %c (int: %d)", firstLetter, (int)firstLetter);
-                debug_print(debugText);  
-                break;
+                case DOT:
+                    buzzer_play_tone(440, 100);
+                    break;
+                case DASH:
+                    buzzer_play_tone(350, 150);
+                    break;
+                case SPACE:
+                    break;
+                case '\n':
+                    break;
+                default:
+                    char debugText[32];
+                    sprintf(debugText, "Invalid character: %c (int: %d)", firstLetter, (int)firstLetter);
+                    debug_print(debugText);  
+                    break;
             }
 
             textBeginIndex++;
@@ -309,7 +323,6 @@ static void debug_print(char *text) {
 
 int main() {
     stdio_init_all();
-    //stdio_usb_init();
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
 
