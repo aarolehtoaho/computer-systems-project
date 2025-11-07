@@ -28,6 +28,7 @@ static void btn_fxn(uint gpio, uint32_t eventMask);
 static Status message_append(char character);
 static void message_clear();
 static char get_char_by_position(float gx, float gy, float gz);
+static void send_message_by_character(int index);
 // Util
 static void debug_print(char *text);
 
@@ -58,8 +59,7 @@ static Status message_append(char character) {
             return MESSAGE_FULL;
         }
     }
-    message[messageLength] = character;
-    messageLength++;
+    message[messageLength++] = character;
     return OK;
 }
 static void message_clear() {
@@ -72,7 +72,6 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
     //space button does not work properly
     switch (gpio) {
         case BUTTON1:
-            debug_print("Space pressed");
             spaceButtonIsPressed = true;
             break;
         case BUTTON2:
@@ -119,6 +118,7 @@ static void sensor_task(void *arg){
                 if (readStatus == OK) {
                     char character = get_char_by_position(gx, gy, gz);
 
+                     /*                   
                     // debug prints
                     char gyroValues[9];
                     sprintf(gyroValues, "%f,%f,%f", gx, gy, gz);
@@ -126,10 +126,22 @@ static void sensor_task(void *arg){
                     char addedCharacter[20];
                     sprintf(addedCharacter, "Added character: %c", character);
                     debug_print(addedCharacter);
+                    */
 
                     Status messageStatus = message_append(character);
                     switch (messageStatus) {
                         case OK:
+                            switch (character) {
+                                case DOT:
+                                    buzzer_play_tone(440, 100);
+                                    break;
+                                case DASH:
+                                    buzzer_play_tone(350, 150);
+                                    break;
+                                case SPACE:
+                                    buzzer_play_tone(250, 100);
+                                    break;
+                            }
                             break;
                         case MESSAGE_FULL:
                             programState = MESSAGE_READY;
@@ -164,22 +176,15 @@ static void send_message_task(void *arg){
 
     uint8_t index = 0;
 
-    // Another possible method is to send the whole message instantly and not just character at a time
+    // Does not work properly. With message: ". -  \n" serial client prints " ???????????e ?  \n" but it should be "te  \n"
 
     for(;;){
         if (programState == MESSAGE_READY) {
             // Checks wheter the received message is valid
             if(message != NULL && messageLength > 0) {
-                // Sends message stored in a global variable 'message'
-                putchar(message[index++]);
-                fflush(stdout); //clears output buffer
-                if (index >= messageLength) {
-                    fflush(stdout);
-                    message_clear();
-                    index = 0;
-                    programState = RECEIVING_MESSAGE;
-                    debug_print("Receiving message from workstation");
-                }
+                //send_message_by_characters(index);
+                puts(message);
+                messageLength = 0;
             } else {
                 // If message is not valid, it is cleared and reset
                 debug_print("Invalid message");
@@ -191,6 +196,18 @@ static void send_message_task(void *arg){
         
         vTaskDelay(pdMS_TO_TICKS(400));
     }
+}
+
+static void send_message_by_characters(int index) {
+    putchar(message[index++]);
+    //fflush(stdout); //clears output buffer
+    if (index >= messageLength) {
+        fflush(stdout);
+        message_clear();
+        index = 0;
+        programState = RECEIVING_MESSAGE;
+        debug_print("Receiving message from workstation");
+    }   
 }
 
 static void receive_message_task(void *arg){
