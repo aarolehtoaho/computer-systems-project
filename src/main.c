@@ -108,6 +108,9 @@ static void sensor_task(void *arg){
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
 
+    // TODO: before changing state to sending message, checking message for correct character combinations prevents
+    // serialclient to not recognize wrong character combinations and printing ?:s
+
     for(;;){
         if (programState == WRITING_MESSAGE) {
             if (characterButtonIsPressed) {
@@ -116,8 +119,9 @@ static void sensor_task(void *arg){
                 if (readStatus == OK) {
                     char character = get_char_by_position(gx, gy, gz);
 
-                    char gyroValues[65];
-                    //sprintf(gyroValues, "Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C", ax, ay, az, gx, gy, gz, t);
+                    // debug prints
+                    char gyroValues[9];
+                    sprintf(gyroValues, "%f,%f,%f", gx, gy, gz);
                     debug_print(gyroValues);
                     char addedCharacter[20];
                     sprintf(addedCharacter, "Added character: %c", character);
@@ -192,11 +196,10 @@ static void send_message_task(void *arg){
 static void receive_message_task(void *arg){
     (void)arg;
 
-    // TODO: Does not work properly. The message in actuator_task has only spaces and newlines
-
     for(;;){
         if (programState == RECEIVING_MESSAGE) {
-            int receivedCharacter = getchar_timeout_us(100000); //should be tried with slight delay (100ms)
+            int delayMs100 = 100000;
+            int receivedCharacter = getchar_timeout_us(delayMs100);
             if (receivedCharacter != PICO_ERROR_TIMEOUT) {
                 message_append((char)receivedCharacter);
                 if ((char)receivedCharacter == '\n') {
@@ -205,6 +208,8 @@ static void receive_message_task(void *arg){
                     debug_print("Displaying message on lcd screen");                  
                 }
             }
+        } else {
+            fflush(stdout);
         }
         
         vTaskDelay(pdMS_TO_TICKS(300));
@@ -241,18 +246,14 @@ static void actuator_task(void *arg){
 
             switch (firstLetter) {
             case DOT:
-                debug_print("dot");
                 buzzer_play_tone(440, 100);
                 break;
             case DASH:
-                debug_print("dash");
                 buzzer_play_tone(350, 150);
                 break;
             case SPACE:
-                debug_print("Space");
                 break;
             case '\n':
-                debug_print("newline");
                 break;
             default:
                 char debugText[17];
