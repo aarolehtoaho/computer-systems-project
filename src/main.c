@@ -69,8 +69,10 @@ static void message_clear() {
 }
 
 static void btn_fxn(uint gpio, uint32_t eventMask){
+    //space button does not work properly
     switch (gpio) {
         case BUTTON1:
+            debug_print("Space pressed");
             spaceButtonIsPressed = true;
             break;
         case BUTTON2:
@@ -115,7 +117,7 @@ static void sensor_task(void *arg){
                     char character = get_char_by_position(gx, gy, gz);
 
                     char gyroValues[65];
-                    sprintf(gyroValues, "Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C", ax, ay, az, gx, gy, gz, t);
+                    //sprintf(gyroValues, "Accel: X=%f, Y=%f, Z=%f | Gyro: X=%f, Y=%f, Z=%f| Temp: %2.2f°C", ax, ay, az, gx, gy, gz, t);
                     debug_print(gyroValues);
                     char addedCharacter[20];
                     sprintf(addedCharacter, "Added character: %c", character);
@@ -158,17 +160,7 @@ static void send_message_task(void *arg){
 
     uint8_t index = 0;
 
-    // TODO: Sending message does not work properly. While using serialclient on workstation, the message is not displayed.
-
     // Another possible method is to send the whole message instantly and not just character at a time
-
-    /*
-    //this could also be used alternatively:
-    for (uint8_t i = 0; i < messageLength; i++) {
-        putchar(message[i]);
-        }
-    */
-    //puts(message); // or this
 
     for(;;){
         if (programState == MESSAGE_READY) {
@@ -178,7 +170,6 @@ static void send_message_task(void *arg){
                 putchar(message[index++]);
                 fflush(stdout); //clears output buffer
                 if (index >= messageLength) {
-                    putchar('\n'); // Is this necessary because message_append adds '\n' when message is finished?
                     fflush(stdout);
                     message_clear();
                     index = 0;
@@ -194,15 +185,14 @@ static void send_message_task(void *arg){
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(300));
+        vTaskDelay(pdMS_TO_TICKS(400));
     }
 }
 
 static void receive_message_task(void *arg){
     (void)arg;
 
-    // TODO: Does not work properly. When state changes to RECEIVING_MESSAGE, no characters are
-    // written in 'message' and state almost immediately changes to DISPLAY_MESSAGE.
+    // TODO: Does not work properly. The message in actuator_task has only spaces and newlines
 
     for(;;){
         if (programState == RECEIVING_MESSAGE) {
@@ -217,15 +207,12 @@ static void receive_message_task(void *arg){
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(400));
+        vTaskDelay(pdMS_TO_TICKS(300));
     }
 }
 
 static void actuator_task(void *arg){
     (void)arg;
-
-    init_display();
-    init_buzzer();
 
     int textBeginIndex = 0;
     clear_display();
@@ -251,14 +238,26 @@ static void actuator_task(void *arg){
 
             // Play sound for the first letter written
             char firstLetter = display_text[0];
+
             switch (firstLetter) {
             case DOT:
+                debug_print("dot");
                 buzzer_play_tone(440, 100);
                 break;
             case DASH:
+                debug_print("dash");
                 buzzer_play_tone(350, 150);
                 break;
+            case SPACE:
+                debug_print("Space");
+                break;
+            case '\n':
+                debug_print("newline");
+                break;
             default:
+                char debugText[17];
+                sprintf(debugText, "Invalid character: %c (int: %d)", firstLetter, (int)firstLetter);
+                debug_print(debugText);  
                 break;
             }
 
@@ -303,6 +302,8 @@ int main() {
     }
 
     init_led();
+    init_display();
+    init_buzzer();
 
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
 
