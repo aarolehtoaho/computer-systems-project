@@ -84,6 +84,18 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
     }
 }
 
+/*
+Calculated averages of the xyz coordinates with Excel.
+
+Averages for when the sensor is stationary:
+x:-0.329547634 y:-0.093464829 z:0.043939707
+
+Averages when the sensor is in another position:
+x:-2.360305225 y:9.05782465 z:5.9698471
+*/
+
+
+
 static char get_char_by_position(float gx, float gy, float gz) {
     // See docs/gyro_measurements.ods
     float gyroPositionProduct = (gx + gy + gz) / 3;
@@ -123,16 +135,6 @@ static void sensor_task(void *arg){
                     char debugText[9];
                     sprintf(debugText, "%f,%f,%f", gx, gy, gz);
                     debug_print(debugText);
-                    */
-                    
-                    /*
-                    Calculated averages of the xyz coordinates with Excel.
-                    
-                    Averages for when the sensor is stationary:
-                    x:-0.329547634 y:-0.093464829 z:0.043939707
-
-                    Averages when the sensor is in another position:
-                    x:-2.360305225 y:9.05782465 z:5.9698471
                     */
 
                     Status messageStatus = message_append(character);
