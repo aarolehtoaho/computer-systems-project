@@ -93,12 +93,9 @@ x:-0.329547634 y:-0.093464829 z:0.043939707
 Averages when the sensor is in another position:
 x:-2.360305225 y:9.05782465 z:5.9698471
 */
-
-
-
 static char get_char_by_position(float gx, float gy, float gz) {
     // See docs/gyro_measurements.ods
-    float gyroPositionProduct = (gx + gy + gz) / 3;
+    float gyroPositionProduct = gx * gy * gz;
     float minProductOnTable = -1;
     float maxProductOnTable = 1;
     bool deviceOnTable = gyroPositionProduct > minProductOnTable && gyroPositionProduct < maxProductOnTable;
@@ -111,11 +108,9 @@ static void sensor_task(void *arg){
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
 
-    // TODO: before changing state to sending message, checking message for correct character combinations prevents
-    // serialclient to not recognize wrong character combinations and printing ?:s
-    // Implement check_last_characters and clear_invalid_characters
-
     message_clear();
+
+    // TODO: test check_last_characters() and clear_invalid_characters()
 
     for(;;){
         if (programState == WRITING_MESSAGE) {
@@ -193,8 +188,9 @@ static const char *morse_codes[] = {
     "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--..",".-.-","---.",".--.-",NULL};
 
 static bool check_last_characters() {
-    // TODO: This function is called after appending a SPACE and checks
+    // This function is called after appending a SPACE and checks
     // if last character combination was valid or not.
+
     int end_of_char = messageLength - 1;
     if(messageLength == 0 || end_of_char < 0){  //this shouldn't happen though
         return true;
@@ -215,7 +211,7 @@ static bool check_last_characters() {
     charSequence[length_of_char] = '\0';
 
     //checks whether the symbol sequence is valid (returns true) or not (returns false)
-    for(int i=0; morse_codes[i] != null; i++){
+    for(int i=0; morse_codes[i] != NULL; i++){
         if(strcmp(charSequence, morse_codes[i]) == 0){
             return true;
         }
@@ -224,8 +220,14 @@ static bool check_last_characters() {
 }
 
 static void clear_invalid_characters() {
-    // TODO: removes last character combination from message
-    return;
+    // Removes last character combination from message
+    message[--messageLength] = '\0';
+    while (message[messageLength != SPACE] && messageLength >= 0) {
+        message[messageLength--] = '\0';
+    }
+    if (messageLength < 0) {
+        message_clear();
+    }
 }
 
 static void send_message_task(void *arg){
