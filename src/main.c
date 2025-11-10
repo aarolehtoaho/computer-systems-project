@@ -186,10 +186,41 @@ static void sensor_task(void *arg){
     }
 }
 
+static const char *morse_codes[] = {
+    // letters from A to Å
+    ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..",
+    ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
+    "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--..",".-.-","---.",".--.-",NULL};
+
 static bool check_last_characters() {
     // TODO: This function is called after appending a SPACE and checks
     // if last character combination was valid or not.
-    return true;
+    int end_of_char = messageLength - 1;
+    if(messageLength == 0 || end_of_char < 0){  //this shouldn't happen though
+        return true;
+    }
+    int start_of_char = end_of_char;
+    while (start_of_char > 0 && message[start_of_char -1] != SPACE){
+        start_of_char--;
+    }
+    int length_of_char = end_of_char - start_of_char + 1;
+    if (length_of_char <= 0){  //this happens for example when second space is pressed
+        return true;
+    }
+    char charSequence[8];
+    if(length_of_char >= (int)sizeof(charSequence)){
+        length_of_char = (int)sizeof(charSequence) -1;
+    }
+    strncpy(charSequence, &message[start_of_char], length_of_char);
+    charSequence[length_of_char] = '\0';
+
+    //checks whether the symbol sequence is valid (returns true) or not (returns false)
+    for(int i=0; morse_codes[i] != null; i++){
+        if(strcmp(charSequence, morse_codes[i]) == 0){
+            return true;
+        }
+    }
+    return false;
 }
 
 static void clear_invalid_characters() {
