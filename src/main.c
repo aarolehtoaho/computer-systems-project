@@ -14,6 +14,8 @@
 #define DASH '-'
 #define SPACE ' '
 
+#define SKIP_CHAR_CHECK false // Set this to true to send all characters valid or not
+
 typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
 typedef enum { OK, INVALID_CHARACTER, MESSAGE_FULL} Status ;
 
@@ -115,9 +117,15 @@ static void sensor_task(void *arg){
     for(;;){
         if (programState == WRITING_MESSAGE) {
             if (messageLength == 0) {
-                // Serial client always displays ?s for the first letter. Adding random first
-                // letter automatically and just ignoring the prefix ?s on serial client
+                // Serial client always displays ?s if there is only one word. 
+                // Adding constant 'ms ' to the message so ? are never printed.
                 message_append(DASH);
+                message_append(DASH);
+                message_append(SPACE);
+                message_append(DOT);
+                message_append(DOT);
+                message_append(DOT);
+                message_append(SPACE);
                 message_append(SPACE);
             }
             if (characterButtonIsPressed) {
@@ -164,7 +172,7 @@ static void sensor_task(void *arg){
                         buzzer_play_tone(250, 100);
                         clear_display();
                         bool validCharacterCombination = check_last_characters();
-                        if (!validCharacterCombination) {
+                        if (!validCharacterCombination && !SKIP_CHAR_CHECK) {
                             clear_invalid_characters();
                         }
                         break;
@@ -199,14 +207,16 @@ static bool check_last_characters() {
     while (start_of_char > 0 && message[start_of_char -1] != SPACE){
         start_of_char--;
     }
-    int length_of_char = end_of_char - start_of_char + 1;
+    int length_of_char = end_of_char - start_of_char;
+    bool overMaxLenght = length_of_char > 5;
+    if (overMaxLenght) {
+        return false;
+    }
     if (length_of_char <= 0){  //this happens for example when second space is pressed
         return true;
     }
-    char charSequence[8];
-    if(length_of_char >= (int)sizeof(charSequence)){
-        length_of_char = (int)sizeof(charSequence) -1;
-    }
+
+    char charSequence[6];
     strncpy(charSequence, &message[start_of_char], length_of_char);
     charSequence[length_of_char] = '\0';
 
@@ -221,9 +231,9 @@ static bool check_last_characters() {
 
 static void clear_invalid_characters() {
     // Removes last character combination from message
-    message[--messageLength] = '\0';
-    while (message[messageLength != SPACE] && messageLength >= 0) {
-        message[messageLength--] = '\0';
+    messageLength--;
+    while (message[messageLength - 1] != SPACE && messageLength >= 0) {
+        messageLength--;
     }
     if (messageLength < 0) {
         message_clear();
@@ -247,7 +257,7 @@ static void send_message_task(void *arg){
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(400));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -354,7 +364,7 @@ static void actuator_task(void *arg){
 
 static void debug_print(char *text) {
     // Serial client does not decode text between __
-    printf("__\n%s\n__", text);
+    printf("__%s__", text);
 }
 
 int main() {
