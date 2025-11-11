@@ -3,13 +3,13 @@
 #include <stdbool.h>
 #include <pico/stdlib.h>
 #include <FreeRTOS.h>
-#include <queue.h>
 #include <task.h>
 #include "tkjhat/sdk.h"
 
 // Default stack size for the tasks. It can be reduced to 1024 if task is not using lot of memory.
 #define DEFAULT_STACK_SIZE 2048
 #define MESSAGE_MAX_LENGTH 256
+
 #define DOT '.'
 #define DASH '-'
 #define SPACE ' '
@@ -17,7 +17,7 @@
 #define SKIP_CHAR_CHECK false // Set this to true to send all characters valid or not
 
 typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
-typedef enum { OK, INVALID_CHARACTER, MESSAGE_FULL} Status ;
+typedef enum { OK, INVALID_CHARACTER, MESSAGE_FULL} MessageStatus ;
 
 // Tasks
 static void sensor_task(void *arg);
@@ -27,7 +27,7 @@ static void actuator_task(void *arg);
 // Callbacks
 static void btn_fxn(uint gpio, uint32_t eventMask);
 // Helper functions
-static Status message_append(char character);
+static MessageStatus message_append(char character);
 static void message_clear();
 static char get_char_by_position(float gx, float gy, float gz);
 static void send_message_by_characters(int *index);
@@ -43,7 +43,8 @@ uint8_t messageLength = 0;
 volatile bool spaceButtonIsPressed = false;
 volatile bool characterButtonIsPressed = false;
 
-static Status message_append(char character) {
+static MessageStatus message_append(char character) {
+    // Handles writing to the message. Caller should handle the possible return statuses
     bool isValidCharacter = character == DOT || character == DASH || character == SPACE;
     if (!isValidCharacter) {
         return INVALID_CHARACTER;
@@ -87,16 +88,11 @@ static void btn_fxn(uint gpio, uint32_t eventMask){
 }
 
 /*
-Calculated averages of the xyz coordinates with Excel.
-
-Averages for when the sensor is stationary:
-x:-0.329547634 y:-0.093464829 z:0.043939707
-
-Averages when the sensor is in another position:
-x:-2.360305225 y:9.05782465 z:5.9698471
+See gyro_measurements.ods for measurements when sensor is on table or in another position.
+it is possible to use sum (gx + gy + gz), average ((gx + gy + gz) / 3) or product (gx * gy * gz).
+Using product seems the most accurate method.
 */
 static char get_char_by_position(float gx, float gy, float gz) {
-    // See docs/gyro_measurements.ods
     float gyroPositionProduct = gx * gy * gz;
     float minProductOnTable = -1;
     float maxProductOnTable = 1;
@@ -104,21 +100,22 @@ static char get_char_by_position(float gx, float gy, float gz) {
     return deviceOnTable ? DOT : DASH;
 }
 
-static void sensor_task(void *arg){
+/*
+The task reads ICM42670 sensor data and adds corresponding character to the message
+based on gyro values. State is changed to MESSAGE_READY when the message is finished    
+*/
+static void sensor_task(void *arg) {
     (void)arg;
+    message_clear();
 
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
-
-    message_clear();
-
-    // TODO: test check_last_characters() and clear_invalid_characters()
 
     for(;;){
         if (programState == WRITING_MESSAGE) {
             if (messageLength == 0) {
                 // Serial client always displays ?s if there is only one word. 
-                // Adding constant 'ms ' to the message so ? are never printed.
+                // Adding constant text 'ms ' to the message so ? are not printed.
                 message_append(DASH);
                 message_append(DASH);
                 message_append(SPACE);
@@ -129,36 +126,35 @@ static void sensor_task(void *arg){
                 message_append(SPACE);
             }
             if (characterButtonIsPressed) {
-                // Adds a character in message based on device position
                 int readStatus = ICM42670_read_sensor_data(&ax, &ay, &az, &gx, &gy, &gz, &t);
                 if (readStatus == OK) {
-                    char character = get_char_by_position(gx, gy, gz);
-
                     /*
                     char debugText[9];
                     sprintf(debugText, "%f,%f,%f", gx, gy, gz);
                     debug_print(debugText);
                     */
 
-                    Status messageStatus = message_append(character);
-                    switch (messageStatus) {
+                    char characterToAdd = get_char_by_position(gx, gy, gz);
+                    switch (characterToAdd) {
+                        case DOT:
+                            buzzer_play_tone(440, 100);
+                            break;
+                        case DASH:
+                            buzzer_play_tone(350, 150);
+                            break;
+                    }
+
+                    MessageStatus status = message_append(characterToAdd);
+                    switch (status) {
                         case OK:
-                            switch (character) {
-                                case DOT:
-                                    buzzer_play_tone(440, 100);
-                                    break;
-                                case DASH:
-                                    buzzer_play_tone(350, 150);
-                                    break;
-                            }
                             clear_display();
                             char addedCharacter[2];
-                            sprintf(addedCharacter, "%c", character);
+                            sprintf(addedCharacter, "%c", characterToAdd);
                             write_text(addedCharacter);                            
                             break;
                         case MESSAGE_FULL:
                             programState = MESSAGE_READY;
-                            debug_print("Sending message");
+                            write_text("sending");
                             break;
                     }
                     characterButtonIsPressed = false;
@@ -167,10 +163,10 @@ static void sensor_task(void *arg){
                 }
             }
             if (spaceButtonIsPressed) {
+                buzzer_play_tone(250, 100);
+                clear_display(); 
                 switch (message_append(SPACE)) {
                     case OK:
-                        buzzer_play_tone(250, 100);
-                        clear_display();
                         bool validCharacterCombination = check_last_characters();
                         if (!validCharacterCombination && !SKIP_CHAR_CHECK) {
                             clear_invalid_characters();
@@ -178,14 +174,14 @@ static void sensor_task(void *arg){
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
-                        debug_print("Sending message");
+                        write_text("sending");
                         break;
                 }
                 spaceButtonIsPressed = false;
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(400));
     }
 }
 
