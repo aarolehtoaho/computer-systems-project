@@ -355,6 +355,10 @@ static void actuator_task(void *arg){
                 gpio_put(RED_LED_PIN, true);
                 buzzer_play_tone(440, 500);
                 gpio_put(RED_LED_PIN, false);
+
+                // Draw a checkmark
+                draw_line(30, 30, 50, 45);
+                draw_line(50, 45, 80, 10);
             }
         }
 
