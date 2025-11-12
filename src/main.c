@@ -111,6 +111,8 @@ static void sensor_task(void *arg) {
     //values read by the ICM42670 sensor
     float ax, ay, az, gx, gy, gz, t;
 
+    clear_display();
+    write_text("write");
     for(;;){
         if (programState == WRITING_MESSAGE) {
             if (messageLength == 0) {
@@ -250,6 +252,7 @@ static void send_message_task(void *arg){
                 message_clear();
             } else {
                 programState = RECEIVING_MESSAGE;
+                write_text("receiving");
             }
         }
         
@@ -270,6 +273,10 @@ static void send_message_by_characters(int *index) {
     }   
 }
 
+/*
+Reads characters sent from the workstation and adds them in the message.
+State is changed after '\n' is read
+*/
 static void receive_message_task(void *arg){
     (void)arg;
 
@@ -293,7 +300,6 @@ static void receive_message_task(void *arg){
     }
 }
 
-
 /* This task handles the actuators of the device (buzzer and LCD).
    It starts by first clearing the LCD-screen and then checks the programState.
    When a any button is pressed, it plays a tone associated with that button and
@@ -305,13 +311,10 @@ static void receive_message_task(void *arg){
    When the message is finished, the led light turns on and the buzzer plays a short sound effect.
    It also displays a checmark on the LCD-screen, wich remains lit until a new message is sent.
 */
-
-
 static void actuator_task(void *arg){
     (void)arg;
 
     int textBeginIndex = 0;
-    clear_display();
 
     for(;;){
         if (programState == DISPLAY_MESSAGE) {
@@ -357,10 +360,14 @@ static void actuator_task(void *arg){
             bool wholeMessageDisplayed = textBeginIndex >= messageLength;
             if (wholeMessageDisplayed) {
                 textBeginIndex = 0;
-                clear_display();
                 message_clear();
                 programState = WRITING_MESSAGE;
                 debug_print("Message displayed");
+
+                // Draw a checkmark
+                clear_display();
+                draw_line(30, 30, 50, 45);
+                draw_line(50, 45, 80, 10);
 
                 // plays the "Zelda item get" sound effect.
                 // Got the correct tones from ChatGPT with prompt: 
@@ -375,10 +382,6 @@ static void actuator_task(void *arg){
                 buzzer_play_tone(640, 100); 
                 buzzer_play_tone(700, 200); 
                 gpio_put(RED_LED_PIN, false);
-
-                // Draw a checkmark
-                draw_line(30, 30, 50, 45);
-                draw_line(50, 45, 80, 10);
             }
         }
 
@@ -391,7 +394,9 @@ static void debug_print(char *text) {
     printf("__%s__", text);
 }
 
-// Initializes everything and runs the whole program.
+/*
+Handles initalizations and creates tasks. Calls vTaskStartScheduler()
+*/
 int main() {
     stdio_init_all();
     init_hat_sdk();
@@ -437,11 +442,7 @@ int main() {
         return 0;
     }
 
-    // Start the scheduler (never returns)
-    vTaskStartScheduler();
+    vTaskStartScheduler(); // never returns
 
-    // Never reach this line.
     return 0;
 }
-
- 
