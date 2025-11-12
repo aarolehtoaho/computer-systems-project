@@ -19,6 +19,12 @@
 typedef enum { WRITING_MESSAGE, MESSAGE_READY, RECEIVING_MESSAGE, DISPLAY_MESSAGE } State ;
 typedef enum { OK, INVALID_CHARACTER, MESSAGE_FULL} MessageStatus ;
 
+static const char *morse_codes[] = {
+    // letters from A to Å
+    ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..",
+    ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
+    "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--..",".-.-","---.",".--.-",NULL};
+
 // Tasks
 static void sensor_task(void *arg);
 static void send_message_task(void *arg);
@@ -187,12 +193,6 @@ static void sensor_task(void *arg) {
     }
 }
 
-static const char *morse_codes[] = {
-    // letters from A to Å
-    ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..",
-    ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
-    "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--..",".-.-","---.",".--.-",NULL};
-
 static bool check_last_characters() {
     // This function is called after appending a SPACE and checks
     // if last character combination was valid or not.
@@ -201,19 +201,22 @@ static bool check_last_characters() {
     if(messageLength == 0 || end_of_char < 0){  //this shouldn't happen though
         return true;
     }
+    //finds the starting point of the character (first morse symbol after space)
     int start_of_char = end_of_char;
     while (start_of_char > 0 && message[start_of_char -1] != SPACE){
         start_of_char--;
     }
     int length_of_char = end_of_char - start_of_char;
+    //if the length of character symbols is more than 5 (alphabet letters have at most 5 symbols in morse code)
     bool overMaxLenght = length_of_char > 5;
     if (overMaxLenght) {
         return false;
     }
-    if (length_of_char <= 0){  //this happens for example when second space is pressed
+     //this happens for example when second space is pressed.
+    if (length_of_char <= 0){ 
         return true;
     }
-
+    //then we take the wanted symbol sequence from the whole message.
     char charSequence[6];
     strncpy(charSequence, &message[start_of_char], length_of_char);
     charSequence[length_of_char] = '\0';
@@ -228,7 +231,7 @@ static bool check_last_characters() {
 }
 
 static void clear_invalid_characters() {
-    // Removes last character combination from message
+    // Removes last symbol combination (invalid character) from message
     messageLength--;
     while (message[messageLength - 1] != SPACE && messageLength >= 0) {
         messageLength--;
@@ -239,9 +242,8 @@ static void clear_invalid_characters() {
 }
 
 static void send_message_task(void *arg){
+    //sends the ready message and goes back to receiving
     (void)arg;
-
-    //uint8_t index = 0;
 
     for(;;){
         if (programState == MESSAGE_READY) {
@@ -250,7 +252,8 @@ static void send_message_task(void *arg){
                 //send_message_by_characters(index);
                 puts(message);
                 message_clear();
-            } else {
+            }
+            /* else {
                 programState = RECEIVING_MESSAGE;
                 write_text("receiving");
             }
@@ -260,7 +263,8 @@ static void send_message_task(void *arg){
     }
 }
 
-static void send_message_by_characters(int *index) {
+//should we remove this or keep it here if not used?
+/*static void send_message_by_characters(int *index) {
     // Sending the whole message works better
     putchar(message[*index++]);
     //fflush(stdout); //clears output buffer
@@ -271,7 +275,7 @@ static void send_message_by_characters(int *index) {
         programState = RECEIVING_MESSAGE;
         debug_print("Receiving message from workstation");
     }   
-}
+}*/
 
 /*
 Reads characters sent from the workstation and adds them in the message.
@@ -285,15 +289,14 @@ static void receive_message_task(void *arg){
             int delayMs100 = 100000;
             int receivedCharacter = getchar_timeout_us(delayMs100);
             if (receivedCharacter != PICO_ERROR_TIMEOUT) {
-                message_append((char)receivedCharacter);
-                if ((char)receivedCharacter == '\n') {
+                char receivedChar = (char)receivedCharacter;
+                message_append(receivedChar);
+                if (receivedChar == '\n') {
                     message[messageLength] = '\0';
                     programState = DISPLAY_MESSAGE;
                     debug_print("Displaying message on lcd screen");                  
                 }
             }
-        } else {
-            fflush(stdout);
         }
         
         vTaskDelay(pdMS_TO_TICKS(300));
@@ -392,6 +395,7 @@ static void actuator_task(void *arg){
 static void debug_print(char *text) {
     // Serial client does not decode text between __
     printf("__%s__", text);
+    fflush(stdout);
 }
 
 /*
