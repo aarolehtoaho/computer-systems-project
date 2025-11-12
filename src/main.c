@@ -253,29 +253,13 @@ static void send_message_task(void *arg){
                 puts(message);
                 message_clear();
             }
-            /* else {
-                programState = RECEIVING_MESSAGE;
-                write_text("receiving");
-            }
+            programState = RECEIVING_MESSAGE;
+            write_text("receiving");
         }
         
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
-
-//should we remove this or keep it here if not used?
-/*static void send_message_by_characters(int *index) {
-    // Sending the whole message works better
-    putchar(message[*index++]);
-    //fflush(stdout); //clears output buffer
-    if (*index >= messageLength) {
-        fflush(stdout);
-        message_clear();
-        *index = 0;
-        programState = RECEIVING_MESSAGE;
-        debug_print("Receiving message from workstation");
-    }   
-}*/
 
 /*
 Reads characters sent from the workstation and adds them in the message.
