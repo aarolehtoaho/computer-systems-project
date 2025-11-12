@@ -293,6 +293,20 @@ static void receive_message_task(void *arg){
     }
 }
 
+
+/* This task handles the actuators of the device (buzzer and LCD).
+   It starts by first clearing the LCD-screen and then checks the programState.
+   When a any button is pressed, it plays a tone associated with that button and
+   displays the correct symbol (DOT or DASH) of the screen.
+
+   When the program receives a message from serial client, it displays the message in morse code
+   accompanied by the corresponding buzzer sounds. 
+   
+   When the message is finished, the led light turns on and the buzzer plays a short sound effect.
+   It also displays a checmark on the LCD-screen, wich remains lit until a new message is sent.
+*/
+
+
 static void actuator_task(void *arg){
     (void)arg;
 
@@ -348,8 +362,18 @@ static void actuator_task(void *arg){
                 programState = WRITING_MESSAGE;
                 debug_print("Message displayed");
 
+                // plays the "Zelda item get" sound effect.
+                // Got the correct tones from ChatGPT with prompt: 
+                // "Give tones raging from 200 to 700 so that I can play Zelda item get sound effect".
                 gpio_put(RED_LED_PIN, true);
-                buzzer_play_tone(440, 500);
+                buzzer_play_tone(200, 100);
+                buzzer_play_tone(360, 100);
+                buzzer_play_tone(320, 100);
+                buzzer_play_tone(400, 100);
+                buzzer_play_tone(480, 100);
+                buzzer_play_tone(560, 100); 
+                buzzer_play_tone(640, 100); 
+                buzzer_play_tone(700, 200); 
                 gpio_put(RED_LED_PIN, false);
 
                 // Draw a checkmark
@@ -367,6 +391,7 @@ static void debug_print(char *text) {
     printf("__%s__", text);
 }
 
+// Initializes everything and runs the whole program.
 int main() {
     stdio_init_all();
     init_hat_sdk();
