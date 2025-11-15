@@ -356,7 +356,7 @@ static void actuator_task(void *arg){
                 draw_line(30, 30, 50, 45);
                 draw_line(50, 45, 80, 10);
 
-                // plays the "Zelda item get" sound effect.
+                // plays the "Zelda item get" buzzer sound.
                 // Got the correct tones from ChatGPT with prompt: 
                 // "Give tones raging from 200 to 700 so that I can play Zelda item get sound effect".
                 gpio_put(RED_LED_PIN, true);
@@ -376,6 +376,7 @@ static void actuator_task(void *arg){
     }
 }
 
+// Ment for testing the program
 static void debug_print(char *text) {
     // Serial client does not decode text between __
     printf("__%s__", text);
@@ -396,14 +397,16 @@ int main() {
     gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
     gpio_set_irq_enabled(BUTTON2, GPIO_IRQ_EDGE_RISE, true);
 
+    //Gyroscope initializtion
     if (init_ICM42670() == OK) {
         ICM42670_start_with_default_values();
     }
-
+    // LED, LCD-screen and buzzer initializtions
     init_led();
     init_display();
     init_buzzer();
 
+    // Task handles and task creation
     TaskHandle_t hSensorTask = NULL, hSendMessageTask = NULL, hReceiveMessageTask = NULL, hActuatorTask = NULL;
 
     BaseType_t result = xTaskCreate(sensor_task, "sensor", DEFAULT_STACK_SIZE, NULL, 2, &hSensorTask);
