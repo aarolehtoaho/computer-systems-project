@@ -162,7 +162,6 @@ static void sensor_task(void *arg) {
                             break;
                         case MESSAGE_FULL:
                             programState = MESSAGE_READY;
-                            write_text("sending");
                             break;
                     }
                     characterButtonIsPressed = false;
@@ -182,7 +181,6 @@ static void sensor_task(void *arg) {
                         break;
                     case MESSAGE_FULL:
                         programState = MESSAGE_READY;
-                        write_text("sending");
                         break;
                 }
                 spaceButtonIsPressed = false;
@@ -232,9 +230,9 @@ static bool check_last_characters() {
 
 static void clear_invalid_characters() {
     // Removes last symbol combination (invalid character) from message
-    messageLength--;
+    message[--messageLength] = '\0';
     while (message[messageLength - 1] != SPACE && messageLength >= 0) {
-        messageLength--;
+        message[--messageLength] = '\0';
     }
     if (messageLength < 0) {
         message_clear();
